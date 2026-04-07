@@ -11,7 +11,7 @@ def extract_features(flow, dst_port):
     packets = flow.packets
     fwd = flow.fwd_packets
     bwd = flow.bwd_packets
-    duration = flow.duration
+    duration = flow.duration()
 
     #Use [0] for empty lists to avoid issues with empty sequence errors
     fwd_sizes = fwd if fwd else [0]

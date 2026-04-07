@@ -3,14 +3,16 @@ which tracks active flows and extracts features when flows are completed or expi
 
 from scapy.all import sniff, IP, TCP, UDP
 from datetime import datetime
-from flow import Flowmanager
+from flow import FlowManager
 from features import extract_features
+from predict import Predictor
 import threading 
 import time
 import argparse
 
-#Init flow manager to track active flows
-flow_manager = Flowmanager()
+#Init flow manager to track active flows and predictor to classify completed flows
+flow_manager = FlowManager()
+predictor = Predictor()
 
 def packet_callback(packet):
     
@@ -36,8 +38,13 @@ def packet_callback(packet):
             #If the flow is completed, extract features
             if completed:
                 features = extract_features(completed, dst_port)
-                print(f"Flow completed: {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
-                print(f"Features Extracted: {len(features)} features")
+                label, confidence = predictor.predict(features)
+
+                if predictor.is_attack(label):
+                    print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
+                    print(f"Flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port} | Protocol: {'TCP'} | Size: {size} bytes")
+                else:
+                    print(f"[OK] Benign flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
     
 
         elif UDP in packet:
@@ -60,8 +67,14 @@ def expire_flows_periodically():
         for flow in expired:
             if flow.packets:
                 features = extract_features(flow, flow.dst_port)
-                print(f"[{'UDP' if flow.protocol == 17 else 'TCP'}] Expired flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
-                print(f"Features Extracted: {len(features)} features")
+                label, confidence = predictor.predict(features)
+                proto = 'UDP' if flow.protocol == 17 else 'TCP'
+
+                if predictor.is_attack(label):
+                    print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
+                    print(f"Flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} | Protocol: {proto} | Size: {flow.total_bytes} bytes")
+                else:
+                    print(f"[OK] Benign flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
 
 
 def start_monitor(interface = None):

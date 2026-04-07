@@ -61,7 +61,7 @@ class Flow:
             timeout = 30 if self.protocol == 17 else 120 #UDP = 17, TCP = 6
         return (current_time - self.last_seen).total_seconds() > timeout
     
-class Flowmanager:
+class FlowManager:
 
     """Manages active flows, adding packets to existing flows or creating new ones as needed."""
 
@@ -69,72 +69,72 @@ class Flowmanager:
         self.flows = {} #Active flows indexed by a tuple of (src_ip, dst_ip, src_port, dst_port, protocol)
         self.completed_flows = [] #Flows that have been completed (FIN/RST) or expired, waiting for feature extraction
 
-        def get_flow_key(self, src_ip, dst_ip, src_port, dst_port, protocol):
+    def get_flow_key(self, src_ip, dst_ip, src_port, dst_port, protocol):
 
-            """Makes bi-directional flow keys so that packets in either direction map to the same flow."""
+        """Makes bi-directional flow keys so that packets in either direction map to the same flow."""
 
-            forward = (src_ip, dst_ip, src_port, dst_port, protocol)
-            backward = (dst_ip, src_ip, dst_port, src_port, protocol)
-            return min(forward, backward)
+        forward = (src_ip, dst_ip, src_port, dst_port, protocol)
+        backward = (dst_ip, src_ip, dst_port, src_port, protocol)
+        return min(forward, backward)
         
-        def add_packet(self, src_ip, dst_ip, src_port, dst_port, protocol, size, flags = None):
+    def add_packet(self, src_ip, dst_ip, src_port, dst_port, protocol, size, flags = None):
 
-            """Adds a packet to the appropriate flow, creating a new flow if necessary.
-              If TCP flags indicate FIN/RST, marks the flow as completed and returns it for feature extraction."""
+        """Adds a packet to the appropriate flow, creating a new flow if necessary.
+            If TCP flags indicate FIN/RST, marks the flow as completed and returns it for feature extraction."""
 
-            timestamp = datetime.now()
-            key = self.get_flow_key(src_ip, dst_ip, src_port, dst_port, protocol)
+        timestamp = datetime.now()
+        key = self.get_flow_key(src_ip, dst_ip, src_port, dst_port, protocol)
 
-            #Check for TCP FIN/RST flags to determine if the flow is completed
-            fin_rst = False
-            if flags:
-                fin_rst = 'F' in str(flags) or 'R' in str(flags)
+        #Check for TCP FIN/RST flags to determine if the flow is completed
+        fin_rst = False
+        if flags:
+            fin_rst = 'F' in str(flags) or 'R' in str(flags)
 
-            #Create new flow if it doesn't exist, then add packet to the flow
-            if key not in self.flows:
-                self.flows[key] = Flow(
-                    (src_ip, dst_ip, src_port, dst_port, protocol),
-                    timestamp
-                )
-            
-            flow = self.flows[key]
+        #Create new flow if it doesn't exist, then add packet to the flow
+        if key not in self.flows:
+            self.flows[key] = Flow(
+                (src_ip, dst_ip, src_port, dst_port, protocol),
+                timestamp
+            )
+        
+        flow = self.flows[key]
 
-            #Determine packet direction based on flow identifiers.
-            if (src_ip, dst_ip, src_port, dst_port) == (flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port):
-                direction = 'fwd'
-            else:
-                direction = 'bwd'
+        #Determine packet direction based on flow identifiers.
+        if (src_ip, dst_ip, src_port, dst_port) == (flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port):
+            direction = 'fwd'
+        else:
+            direction = 'bwd'
 
-            flow.add_packet(size, timestamp, direction, flags)
+        flow.add_packet(size, timestamp, direction, flags)
 
-            #Complete flopw if FIN/RST flags are seen in TCP packets
-            if fin_rst:
-                self.completed_flows.append(flow)
+        #Complete flopw if FIN/RST flags are seen in TCP packets
+        if fin_rst:
+            self.completed_flows.append(flow)
+            del self.flows[key]
+            return flow
+        
+        return None
+        
+    def expire_flows(self):
+
+        """Checks active flows for expiration based on inactivity and moves expired flows to the completed_flows list for feature extraction.
+        Called in the background thread in monitor.py to periodically clean up inactive flows."""
+
+        current_time = datetime.now()
+        expired = []
+
+        for key, flow in list(self.flows.items()):
+            if flow.is_expired(current_time):
+                expired.append(flow)
                 del self.flows[key]
-                return flow
-            
-            return None
-        
-        def expire_flows(self):
 
-            """Checks active flows for expiration based on inactivity and moves expired flows to the completed_flows list for feature extraction.
-            Called in the background thread in monitor.py to periodically clean up inactive flows."""
+        self.completed_flows.extend(expired)
+        return expired
+    
+    def get_completed_flows(self):
 
-            current_time = datetime.now()
-            expired = []
+        """Returns and clears the list of completed flows"""
 
-            for key, flow in list(self.flows.items()):
-                if flow.is_expired(current_time):
-                    expired.append(flow)
-                    del self.flows[key]
-
-            self.completed_flows.extend(expired)
-            return expired
-        
-        def get_completed_flows(self):
-
-            """Returns and clears the list of completed flows"""
-
-            flows = self.completed_flows.copy()
-            self.completed_flows.clear()
-            return flows
+        flows = self.completed_flows.copy()
+        self.completed_flows.clear()
+        return flows
