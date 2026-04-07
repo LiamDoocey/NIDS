@@ -1,0 +1,140 @@
+"""Manages network flows and groups into TCP/UDP sessions, tracks flow state,
+ and extracts features when flows are completed or expired."""
+
+from datetime import datetime
+
+class Flow:
+
+    """Represents a single network flow, tracking packets,
+      timestamps, and state."""
+    
+    def __init__(self, packet, timestamp):
+        #Flow identifiers
+        self.src_ip = packet[0]
+        self.dst_ip = packet[1]
+        self.src_port = packet[2]
+        self.dst_port = packet[3]
+        self.protocol = packet[4]
+
+        #Packet storage and
+        self.packets = [] #All packets in the flow
+        self.fwd_packets = [] #Sizes of forward packets (src -> dst)
+        self.bwd_packets = [] #Sizes of backward packets (dst -> src)
+
+        #Timestamps and state
+        self.start_time = timestamp 
+        self.last_seen = timestamp
+        self.is_active = True
+
+    def add_packet(self, size, timestamp, direction, flags = None):
+
+        """Adds a packet to the flow, updating packet lists, timestamps, and state.
+          If TCP flags indicate FIN/RST, marks the flow as completed."""
+
+        self.packets.append({
+            'size': size,
+            'timestamp': timestamp,
+            'direction': direction,
+            'flags': flags
+        })
+
+        #Update forward/backward packet lists based on direction for easier feature extraction
+        if direction == 'fwd':
+            self.fwd_packets.append(size)
+        else:
+            self.bwd_packets.append(size)
+
+        self.last_seen = timestamp
+        
+    def duration(self):
+
+        """Returns flow in microseconds to match CIC-IDS-2017 format."""
+
+        return (self.last_seen - self.start_time).total_seconds() * 1e6
+    
+    def is_expired(self, current_time, timeout = None):
+        
+        """Determines if the flow has been inactive for longer than the specified timeout.
+          If no timeout is provided, uses default values based on protocol (30s for UDP, 120s for TCP)."""
+
+        if timeout is None:
+            timeout = 30 if self.protocol == 17 else 120 #UDP = 17, TCP = 6
+        return (current_time - self.last_seen).total_seconds() > timeout
+    
+class Flowmanager:
+
+    """Manages active flows, adding packets to existing flows or creating new ones as needed."""
+
+    def __init__(self):
+        self.flows = {} #Active flows indexed by a tuple of (src_ip, dst_ip, src_port, dst_port, protocol)
+        self.completed_flows = [] #Flows that have been completed (FIN/RST) or expired, waiting for feature extraction
+
+        def get_flow_key(self, src_ip, dst_ip, src_port, dst_port, protocol):
+
+            """Makes bi-directional flow keys so that packets in either direction map to the same flow."""
+
+            forward = (src_ip, dst_ip, src_port, dst_port, protocol)
+            backward = (dst_ip, src_ip, dst_port, src_port, protocol)
+            return min(forward, backward)
+        
+        def add_packet(self, src_ip, dst_ip, src_port, dst_port, protocol, size, flags = None):
+
+            """Adds a packet to the appropriate flow, creating a new flow if necessary.
+              If TCP flags indicate FIN/RST, marks the flow as completed and returns it for feature extraction."""
+
+            timestamp = datetime.now()
+            key = self.get_flow_key(src_ip, dst_ip, src_port, dst_port, protocol)
+
+            #Check for TCP FIN/RST flags to determine if the flow is completed
+            fin_rst = False
+            if flags:
+                fin_rst = 'F' in str(flags) or 'R' in str(flags)
+
+            #Create new flow if it doesn't exist, then add packet to the flow
+            if key not in self.flows:
+                self.flows[key] = Flow(
+                    (src_ip, dst_ip, src_port, dst_port, protocol),
+                    timestamp
+                )
+            
+            flow = self.flows[key]
+
+            #Determine packet direction based on flow identifiers.
+            if (src_ip, dst_ip, src_port, dst_port) == (flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port):
+                direction = 'fwd'
+            else:
+                direction = 'bwd'
+
+            flow.add_packet(size, timestamp, direction, flags)
+
+            #Complete flopw if FIN/RST flags are seen in TCP packets
+            if fin_rst:
+                self.completed_flows.append(flow)
+                del self.flows[key]
+                return flow
+            
+            return None
+        
+        def expire_flows(self):
+
+            """Checks active flows for expiration based on inactivity and moves expired flows to the completed_flows list for feature extraction.
+            Called in the background thread in monitor.py to periodically clean up inactive flows."""
+
+            current_time = datetime.now()
+            expired = []
+
+            for key, flow in list(self.flows.items()):
+                if flow.is_expired(current_time):
+                    expired.append(flow)
+                    del self.flows[key]
+
+            self.completed_flows.extend(expired)
+            return expired
+        
+        def get_completed_flows(self):
+
+            """Returns and clears the list of completed flows"""
+
+            flows = self.completed_flows.copy()
+            self.completed_flows.clear()
+            return flows
