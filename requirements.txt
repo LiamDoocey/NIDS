@@ -11,3 +11,4 @@ scapy
 boto3
 python-dotenv
 requests
+flask
