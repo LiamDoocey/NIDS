@@ -6,13 +6,15 @@ from datetime import datetime
 from flow import FlowManager
 from features import extract_features
 from predict import Predictor
+from alerts import AlertManager
 import threading 
 import time
 import argparse
 
-#Init flow manager to track active flows and predictor to classify completed flows
+#Init managers
 flow_manager = FlowManager()
 predictor = Predictor()
+alert_manager = AlertManager()
 
 def packet_callback(packet):
     
@@ -38,11 +40,19 @@ def packet_callback(packet):
             #If the flow is completed, extract features
             if completed:
                 features = extract_features(completed, dst_port)
+
+                start = time.time()
                 label, confidence = predictor.predict(features)
+                elapsed = (time.time() - start) * 1000
+                print(f"Prediction time: {elapsed:.2f} ms")
 
                 if predictor.is_attack(label):
                     print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                     print(f"Flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port} | Protocol: {'TCP'} | Size: {size} bytes")
+
+                    alert_manager.send_alert(
+                        label, confidence, src_ip, dst_ip, src_port, dst_port, 'TCP'
+                    )
                 else:
                     print(f"[OK] Benign flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
     
@@ -73,6 +83,10 @@ def expire_flows_periodically():
                 if predictor.is_attack(label):
                     print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                     print(f"Flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} | Protocol: {proto} | Size: {flow.total_bytes} bytes")
+
+                    alert_manager.send_alert(
+                        label, confidence, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, proto
+                    )
                 else:
                     print(f"[OK] Benign flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
 
