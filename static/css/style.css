@@ -1,0 +1,44 @@
+body {
+            font-family: Arial, sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #58a6ff;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-card h2 {
+            font-size: 2em;
+            margin: 0;
+            color: #58a6ff;
+        }
+
+        .stat-card p {
+            margin: 8px 0 0;
+            color: #8b949e;
+            font-size: 0.9em;
+        }
+
+        .stat-card.alerts h2 { color: #f85149; }
+        .stat-card.threats h2 { color: #f85149; }
+        .stat-card.benign h2 { color: #3fb950; }

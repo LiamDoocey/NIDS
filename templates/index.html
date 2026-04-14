@@ -4,10 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NIDS Dashboard</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/style.css')}}">
 </head>
 <body>
     <h1>NIDS Dashboard</h1>
-    <p>Welcome to the NIDS Dashboard!</p>
-</body> 
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h2 id="total-flows">0</h2>
+            <p>Total Flows</p>
+        </div>
+        <div class="stat-card benign">
+            <h2 id="benign-flows">0</h2>
+            <p>Benign Flows</p>
+        </div>
+        <div class="stat-card alerts">
+            <h2 id="alert-count">0</h2>
+            <p>Alerts</p>
+        </div>
+        <div class="stat-card threats">
+            <h2 id="threat-count">0</h2>
+            <p>Threat Intel Matches</p>
+        </div>
+    </div>
+    <script src="{{url_for('static', filename='js/dashboard.js')}}"></script>
+</body>
 </html>
