@@ -41,7 +41,7 @@ def get_stats():
 
     return jsonify(stats)
 
-def add_traffic_event(event_type, label, src_ip, dst_ip, src_port, dst_port, protocol, confidence = None):
+def add_traffic_event(event_type):
 
     dashboard_data['stats']['total_flows'] += 1
 

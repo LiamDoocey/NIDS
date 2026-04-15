@@ -8,6 +8,7 @@ from features import extract_features
 from predict import Predictor
 from alerts import AlertManager
 from threat_intel import ThreatIntel
+from dashboard import add_traffic_event, start_dashboard
 import threading 
 import time
 import argparse
@@ -54,6 +55,8 @@ def packet_callback(packet):
                     print(f"Source IP: {src_ip} | Destination IP: {dst_ip} | Source Port: {src_port} | Destination Port: {dst_port} | Protocol: TCP | Size: {size} bytes")
                     print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
 
+                    add_traffic_event('THREAT_INTEL_MATCH')
+
                     alert_manager.send_alert(
                         label = 'THREAT_INTEL_MATCH',
                         confidence = intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'],
@@ -73,11 +76,14 @@ def packet_callback(packet):
                     print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                     print(f"Flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port} | Protocol: {'TCP'} | Size: {size} bytes")
 
+                    add_traffic_event('ALERT')
+
                     alert_manager.send_alert(
                         label, confidence, src_ip, dst_ip, src_port, dst_port, 'TCP'
                     )
                 else:
                     print(f"[OK] Benign flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
+                    add_traffic_event('OK')
     
 
         elif UDP in packet:
@@ -109,6 +115,8 @@ def expire_flows_periodically():
                     print(f"Source IP: {flow.src_ip} | Destination IP: {flow.dst_ip} | Source Port: {flow.src_port} | Destination Port: {flow.dst_port} | Protocol: {proto}")
                     print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
 
+                    add_traffic_event('THREAT_INTEL_MATCH')
+
                     alert_manager.send_alert(
                         label = 'THREAT_INTEL_MATCH',
                         confidence = intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'],
@@ -126,11 +134,14 @@ def expire_flows_periodically():
                     print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                     print(f"Flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} | Protocol: {proto}")
 
+                    add_traffic_event('ALERT')
+
                     alert_manager.send_alert(
                         label, confidence, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, proto
                     )
                 else:
                     print(f"[OK] Benign flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
+                    add_traffic_event('OK')
 
 
 def start_monitor(interface = None):
@@ -157,4 +168,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--iface', type = str, default = None)
     args = parser.parse_args()
+
+    dashboard_thread = threading.Thread(
+        target = start_dashboard,
+        daemon = True
+    )
+    dashboard_thread.start()
+
     start_monitor(interface = args.iface)
