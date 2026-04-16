@@ -94,6 +94,77 @@ function updateStats(){
         .catch(err => console.error('Error fetching stats: ', err));
 }
 
+function updateAlerts() {
+    fetch('/api/alerts')
+        .then(res => res.json())
+        .then(data => {
+            const list = document.getElementById('alert-list');
+
+            if (data.length === 0) {
+                list.innerHTML = '<p class="no-alerts">No alerts detected yet</p>';
+                return;
+            }
+
+            list.innerHTML = data.map(alert => `
+                <div class="alert-item ${alert.event_type}" onclick="showAlert(${JSON.stringify(alert).replace(/"/g, '&quot;')})">
+                    <span class="alert-badge ${alert.event_type}">
+                        ${alert.event_type === 'ALERT' ? 'ML ALERT' : 'THREAT INTEL'}
+                    </span>
+                    <span class="alert-summary">
+                        <span>${alert.label}</span> —
+                        ${alert.src_ip}:${alert.src_port} → ${alert.dst_ip}:${alert.dst_port}
+                    </span>
+                    <span class="alert-time">${alert.timestamp}</span>
+                </div>
+            `).join('');
+        })
+        .catch(err => console.error('Error fetching alerts:', err));
+}
+
+function showAlert(alert) {
+    document.getElementById('modal-title').textContent = 
+        alert.event_type === 'ALERT' ? 'ML Detection Alert' : 'Threat Intelligence Match';
+
+    document.getElementById('modal-body').innerHTML = `
+        <div class="modal-body-row">
+            <span class="key">Time</span>
+            <span class="value">${alert.timestamp}</span>
+        </div>
+        <div class="modal-body-row">
+            <span class="key">Type</span>
+            <span class="value">${alert.event_type === 'ALERT' ? 'ML Alert' : 'Threat Intel Match'}</span>
+        </div>
+        <div class="modal-body-row">
+            <span class="key">Label</span>
+            <span class="value">${alert.label}</span>
+        </div>
+        <div class="modal-body-row">
+            <span class="key">Source</span>
+            <span class="value">${alert.src_ip}:${alert.src_port}</span>
+        </div>
+        <div class="modal-body-row">
+            <span class="key">Destination</span>
+            <span class="value">${alert.dst_ip}:${alert.dst_port}</span>
+        </div>
+        <div class="modal-body-row">
+            <span class="key">Protocol</span>
+            <span class="value">${alert.protocol}</span>
+        </div>
+        <div class="modal-body-row">
+            <span class="key">Confidence</span>
+            <span class="value">${alert.confidence ? alert.confidence + '%' : 'N/A'}</span>
+        </div>
+    `;
+
+    document.getElementById('alert-modal').classList.remove('hidden');
+    document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('alert-modal').classList.add('hidden');
+    document.getElementById('modal-overlay').classList.add('hidden');
+}
+
 initChart();
 updateStats();
 updateChart();
@@ -101,4 +172,7 @@ updateChart();
 setInterval(() => {
     updateStats();
     updateChart();
+    updateAlerts();
 }, 5000); //Every 5 Seconds
+
+updateAlerts(); //Onload

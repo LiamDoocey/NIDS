@@ -90,3 +90,145 @@ canvas {
     color: #ffffff;
     border-color: #1f6feb;
 }
+
+#alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.alert-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.alert-item:hover {
+    border-color: #58a6ff;
+}
+
+.alert-item.ALERT {
+    border-left: 3px solid #f85149;
+}
+
+.alert-item.THREAT_INTEL_MATCH {
+    border-left: 3px solid #d29922;
+}
+
+.alert-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: bold;
+    min-width: 80px;
+    text-align: center;
+}
+
+.alert-badge.ALERT {
+    background: #4d1f1f;
+    color: #f85149;
+}
+
+.alert-badge.THREAT_INTEL_MATCH {
+    background: #3d2c00;
+    color: #d29922;
+}
+
+.alert-summary {
+    flex: 1;
+    font-size: 0.85em;
+    color: #8b949e;
+}
+
+.alert-summary span {
+    color: #e6edf3;
+}
+
+.alert-time {
+    font-size: 0.75em;
+    color: #8b949e;
+}
+
+.no-alerts {
+    color: #8b949e;
+    text-align: center;
+    padding: 20px;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 24px;
+    z-index: 100;
+    min-width: 400px;
+    max-width: 600px;
+    width: 90%;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 99;
+}
+
+.modal.hidden, .modal-overlay.hidden {
+    display: none;
+}
+
+.modal-close {
+    float: right;
+    background: none;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 1.2em;
+    padding: 0;
+}
+
+.modal-close:hover {
+    color: #e6edf3;
+}
+
+.modal h3 {
+    margin: 0 0 16px;
+    color: #e6edf3;
+}
+
+.modal-body-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #21262d;
+    font-size: 0.9em;
+}
+
+.modal-body-row:last-child {
+    border-bottom: none;
+}
+
+.modal-body-row .key {
+    color: #8b949e;
+}
+
+.modal-body-row .value {
+    color: #e6edf3;
+    font-weight: 500;
+}

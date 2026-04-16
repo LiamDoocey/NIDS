@@ -52,6 +52,10 @@ def get_traffic_history_route():
 
     return jsonify(get_traffic_history(cutoff))
 
+@app.route('/api/alerts')
+def get_alerts_route():
+    return jsonify(get_alert_history())
+
 def add_traffic_event(event_type, label, src_ip, dst_ip, src_port, dst_port, protocol, confidence):
 
     log_traffic_event(event_type)
