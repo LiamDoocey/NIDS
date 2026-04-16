@@ -68,7 +68,7 @@ function initChart(){
 }
 
 function updateChart(){
-    fetch('/api/traffic_history?interval=${activeInterval}')
+    fetch(`/api/traffic_history?interval=${activeInterval}`)
         .then(res => res.json())
         .then(data => {
             if (!trafficChart) return;
