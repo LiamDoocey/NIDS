@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request
 from alerts import AlertManager
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from database import *
 
 load_dotenv()
 
@@ -13,28 +14,21 @@ app = Flask(
 
 alert_manager = AlertManager()
 
-#Shared data store
-dashboard_data = {
-    'stats': {
-        'total_flows': 0,
-        'total_alerts': 0,
-        'benign_flows': 0,
-        'threat_intel_matches': 0,
-        'start_time': datetime.now().isoformat()
-    },
-    'traffic_history': [],
-}
+init_db()
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/api/stats')
-def get_stats():
-    stats = dashboard_data['stats'].copy()
+def get_stats_route():
+    stats = get_stats()
 
-    start = datetime.fromisoformat(stats['start_time'])
-    uptime_seconds = (datetime.now() - start).total_seconds()
+    if 'start_time' not in app.config:
+        app.config['start_time'] = datetime.now()
+
+    uptime_seconds = (datetime.now() - app.config['start_time']).total_seconds()
+    
     hours = int(uptime_seconds // 3600)
     minutes = int((uptime_seconds % 3600) // 60)
     seconds = int(uptime_seconds % 60)
@@ -43,7 +37,7 @@ def get_stats():
     return jsonify(stats)
 
 @app.route('/api/traffic_history')
-def get_traffic_history():
+def get_traffic_history_route():
     interval = request.args.get('interval', 'hour')
     now = datetime.now()
 
@@ -56,45 +50,15 @@ def get_traffic_history():
 
     cutoff = now - intervals.get(interval, timedelta(hours = 1))
 
-    filtered = [
-        entry for entry in dashboard_data['traffic_history'] if datetime.fromisoformat(entry['timestamp']) >= cutoff
-    ]
+    return jsonify(get_traffic_history(cutoff))
 
-    return jsonify(filtered)
+def add_traffic_event(event_type, label, src_ip, dst_ip, src_port, dst_port, protocol, confidence):
 
-def add_traffic_event(event_type):
+    log_traffic_event(event_type)
 
-    dashboard_data['stats']['total_flows'] += 1
+    if event_type in ('ALERT', 'THREAT_INTEL_MATCH'):
+        log_alert(event_type, label, src_ip, dst_ip, src_port, dst_port, protocol, confidence)
 
-    if event_type == 'ALERT':
-        dashboard_data['stats']['total_alerts'] += 1
-    elif event_type == 'THREAT_INTEL_MATCH':
-        dashboard_data['stats']['threat_intel_matches'] += 1
-    else:
-        dashboard_data['stats']['benign_flows'] += 1
-
-    now = datetime.now().strftime('%H:%M')
-    history = dashboard_data['traffic_history']
-
-    if history and history[-1]['time'] == now:
-        history[-1]['total'] += 1
-
-        if event_type == 'ALERT':
-            history[-1]['alerts'] += 1
-        elif event_type == 'THREAT_INTEL_MATCH':
-            history[-1]['threats'] += 1
-        else:
-            history[-1]['benign'] += 1
-    else:
-        history.append({
-            'time': now,
-            'timestamp': datetime.now().isoformat(),
-            'total': 1, 
-            'alerts': 1 if event_type == 'ALERT' else 0,
-            'threats': 1 if event_type == 'THREAT_INTEL_MATCH' else 0,
-            'benign': 1 if event_type == 'OK' else 0
-        })
-        dashboard_data['traffic_history'] = history[-30:]
 
 def start_dashboard(host = '0.0.0.0', port = 5000, debug = False):
     print(f"Starting dashboard on {host}:{port}...")

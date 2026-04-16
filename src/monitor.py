@@ -55,7 +55,9 @@ def packet_callback(packet):
                     print(f"Source IP: {src_ip} | Destination IP: {dst_ip} | Source Port: {src_port} | Destination Port: {dst_port} | Protocol: TCP | Size: {size} bytes")
                     print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
 
-                    add_traffic_event('THREAT_INTEL_MATCH')
+                    add_traffic_event('THREAT_INTEL_MATCH', 'THREAT_INTEL_MATCH',
+                        src_ip, dst_ip, src_port, dst_port, 'TCP',
+                        intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'])
 
                     alert_manager.send_alert(
                         label = 'THREAT_INTEL_MATCH',
@@ -76,14 +78,14 @@ def packet_callback(packet):
                     print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                     print(f"Flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port} | Protocol: {'TCP'} | Size: {size} bytes")
 
-                    add_traffic_event('ALERT')
+                    add_traffic_event('ALERT', label, src_ip, dst_ip, src_port, dst_port, 'TCP', confidence)
 
                     alert_manager.send_alert(
                         label, confidence, src_ip, dst_ip, src_port, dst_port, 'TCP'
                     )
                 else:
                     print(f"[OK] Benign flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
-                    add_traffic_event('OK')
+                    add_traffic_event('OK', 'BENIGN', src_ip, dst_ip, src_port, dst_port, 'TCP', confidence)
     
 
         elif UDP in packet:
@@ -115,7 +117,9 @@ def expire_flows_periodically():
                     print(f"Source IP: {flow.src_ip} | Destination IP: {flow.dst_ip} | Source Port: {flow.src_port} | Destination Port: {flow.dst_port} | Protocol: {proto}")
                     print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
 
-                    add_traffic_event('THREAT_INTEL_MATCH')
+                    add_traffic_event('THREAT_INTEL_MATCH', 'THREAT_INTEL_MATCH',
+                        flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, 'TCP',
+                        intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'])
 
                     alert_manager.send_alert(
                         label = 'THREAT_INTEL_MATCH',
@@ -134,14 +138,14 @@ def expire_flows_periodically():
                     print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                     print(f"Flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} | Protocol: {proto}")
 
-                    add_traffic_event('ALERT')
+                    add_traffic_event('ALERT', label, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, 'TCP', confidence)
 
                     alert_manager.send_alert(
                         label, confidence, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, proto
                     )
                 else:
                     print(f"[OK] Benign flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
-                    add_traffic_event('OK')
+                    add_traffic_event('OK', 'BENIGN', flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, 'TCP', confidence)
 
 
 def start_monitor(interface = None):

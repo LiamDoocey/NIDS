@@ -77,6 +77,7 @@ function updateChart(){
             trafficChart.data.datasets[0].data = data.map(d => d.benign)
             trafficChart.data.datasets[1].data = data.map(d => d.alerts)
             trafficChart.data.datasets[2].data = data.map(d => d.threats)
+            trafficChart.update();
         })
         .catch(err => console.error('Error fetching traffic history: ', err));
 }
