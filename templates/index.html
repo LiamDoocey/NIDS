@@ -26,6 +26,18 @@
             <p>Threat Intel Matches</p>
         </div>
     </div>
+
+    <div class="section">
+        <h2>Traffic Volume</h2>
+        <div class="chart-controls">
+            <button class="interval-btn active" onclick="setChartInterval('hour')">Hour</button>
+            <button class="interval-btn" onclick="setChartInterval('day')">Day</button>
+            <button class="interval-btn" onclick="setChartInterval('week')">Week</button>
+            <button class="interval-btn" onclick="setChartInterval('month')">Month</button>
+        </div>
+        <canvas id="traffic-chart"></canvas>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="{{url_for('static', filename='js/dashboard.js')}}"></script>
 </body>
 </html>

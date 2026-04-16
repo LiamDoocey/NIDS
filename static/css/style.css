@@ -1,44 +1,92 @@
 body {
-            font-family: Arial, sans-serif;
-            background: #0d1117;
-            color: #e6edf3;
-            margin: 0;
-            padding: 20px;
-        }
+    font-family: Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    margin: 0;
+    padding: 20px;
+}
 
-        h1 {
-            color: #58a6ff;
-            border-bottom: 1px solid #30363d;
-            padding-bottom: 10px;
-        }
+h1 {
+    color: #58a6ff;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 10px;
+}
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin: 20px 0;
-        }
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+}
 
-        .stat-card {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-        }
+.stat-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
 
-        .stat-card h2 {
-            font-size: 2em;
-            margin: 0;
-            color: #58a6ff;
-        }
+.stat-card h2 {
+    font-size: 2em;
+    margin: 0;
+    color: #58a6ff;
+}
 
-        .stat-card p {
-            margin: 8px 0 0;
-            color: #8b949e;
-            font-size: 0.9em;
-        }
+.stat-card p {
+    margin: 8px 0 0;
+    color: #8b949e;
+    font-size: 0.9em;
+}
 
-        .stat-card.alerts h2 { color: #f85149; }
-        .stat-card.threats h2 { color: #f85149; }
-        .stat-card.benign h2 { color: #3fb950; }
+.stat-card.alerts h2 { color: #f85149; }
+.stat-card.threats h2 { color: #f85149; }
+.stat-card.benign h2 { color: #3fb950; }
+
+.section {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.section h2 {
+    margin: 0 0 16px;
+    font-size: 1em;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+canvas {
+    max-height: 250px;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.interval-btn {
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s;
+}
+
+.interval-btn:hover {
+    background: #30363d;
+    color: #e6edf3;
+}
+
+.interval-btn.active {
+    background: #1f6feb;
+    color: #ffffff;
+    border-color: #1f6feb;
+}
