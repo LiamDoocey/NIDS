@@ -3,6 +3,7 @@ import json
 import os
 import threading
 from datetime import datetime
+from database import set_cooldown, get_cooldown
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -61,12 +62,12 @@ class AlertManager:
 
     def _should_alert(self, label, src_ip):
         
-        key = (src_ip, label)
-        now = datetime.now()
-
         with self._lock:
-            if key in self._cooldowns:
-                elapsed_time = (now - self._cooldowns[key]).total_seconds()
+
+            last = get_cooldown(src_ip, label)
+
+            if last:
+                elapsed_time = (datetime.now() - last).total_seconds()
 
                 if elapsed_time < self.cooldown_seconds:
                     remaining = self.cooldown_seconds - elapsed_time
@@ -74,7 +75,7 @@ class AlertManager:
                     print (f"[ALERT COOLDOWN] Duplicate alert detected: {label} from {src_ip} | {remaining:.0f}s remaining on alert cooldown.")
                     return False
             
-            self._cooldowns[key] = now
+            set_cooldown(src_ip, label)
             return True
 
     def subscribe(self, phone_number):

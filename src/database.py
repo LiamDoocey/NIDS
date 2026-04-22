@@ -52,6 +52,16 @@ def init_db():
         )
     ''')
 
+    #Cooldown table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cooldowns (
+            src_ip TEXT NOT NULL,
+            label TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            PRIMARY KEY (src_ip, label)
+        )
+    ''')
+
     #Insert default stats row if it doesn't exist
     cursor.execute('''
         INSERT OR IGNORE INTO stats (id, total_flows, total_alerts, benign_flows, threat_intel_matches)
@@ -150,3 +160,23 @@ def get_alert_history(limit = 100):
     conn.close()
     return [dict(row) for row in rows]
 
+def set_cooldown(src_ip, label):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        'INSERT OR REPLACE INTO cooldowns (src_ip, label, timestamp) VALUES (?, ?, ?)',
+        (src_ip, label, datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+def get_cooldown(src_ip, label):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT timestamp FROM cooldowns WHERE src_ip = ? AND label = ?', (src_ip, label))
+
+    row = cursor.fetchone()
+    conn.close()
+    return datetime.fromisoformat(row['timestamp']) if row else None
