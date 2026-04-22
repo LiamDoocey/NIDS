@@ -48,7 +48,7 @@ class Predictor:
 
             print("\n ----- Flow Stats -----")
             for cls, prob in sorted(zip(classes, probabilitity), key = lambda x: x[1], reverse = True):
-                print(f"{cls: < 35} {prob * 100:6.2f}%")
+                print(f"{cls:<35} {prob * 100:6.2f}%")
             print(f"Prediction time: {prediction_time:.2f}ms")
 
             #Detection threshold

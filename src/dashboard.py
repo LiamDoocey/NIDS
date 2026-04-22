@@ -12,8 +12,6 @@ app = Flask(
     static_folder = '../static'
 )
 
-alert_manager = AlertManager()
-
 init_db()
 
 @app.route('/')

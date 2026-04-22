@@ -77,12 +77,14 @@ class FlowManager:
         backward = (dst_ip, src_ip, dst_port, src_port, protocol)
         return min(forward, backward)
         
-    def add_packet(self, src_ip, dst_ip, src_port, dst_port, protocol, size, flags = None):
+    def add_packet(self, src_ip, dst_ip, src_port, dst_port, protocol, size, flags = None, timestamp = None):
 
         """Adds a packet to the appropriate flow, creating a new flow if necessary.
             If TCP flags indicate FIN/RST, marks the flow as completed and returns it for feature extraction."""
 
-        timestamp = datetime.now()
+        if timestamp is None:
+            timestamp = datetime.now()
+            
         key = self.get_flow_key(src_ip, dst_ip, src_port, dst_port, protocol)
 
         #Check for TCP FIN/RST flags to determine if the flow is completed

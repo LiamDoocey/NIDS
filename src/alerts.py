@@ -1,6 +1,7 @@
 import boto3
 import json
 import os
+import threading
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -40,6 +41,7 @@ class AlertManager:
         #Store 5 minutes alert cooldown cahce to stop alert spam.
         self._cooldowns = {}
         self.cooldown_seconds = 300
+        self._lock = threading.Lock()
 
     def _load_subscriptions(self):
 
@@ -62,17 +64,18 @@ class AlertManager:
         key = (src_ip, label)
         now = datetime.now()
 
-        if key in self._cooldowns:
-            elapsed_time = (now - self._cooldowns[key]).total_seconds()
+        with self._lock:
+            if key in self._cooldowns:
+                elapsed_time = (now - self._cooldowns[key]).total_seconds()
 
-            if elapsed_time < self.cooldown_seconds:
-                remaining = self.cooldown_seconds - elapsed_time
+                if elapsed_time < self.cooldown_seconds:
+                    remaining = self.cooldown_seconds - elapsed_time
 
-                print (f"[ALERT COOLDOWN] Duplicate alert detected: {label} from {src_ip} | {remaining:.0f}s remaining on alert cooldown.")
-                return False
+                    print (f"[ALERT COOLDOWN] Duplicate alert detected: {label} from {src_ip} | {remaining:.0f}s remaining on alert cooldown.")
+                    return False
             
-        self._cooldowns[key] = now
-        return True
+            self._cooldowns[key] = now
+            return True
 
     def subscribe(self, phone_number):
 
