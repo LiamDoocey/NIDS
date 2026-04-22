@@ -12,9 +12,14 @@ class AlertManager:
     """Manages AWS SNS subscriptions and sends alerts when malicious flows are detected by the NIDS.
     Subscriptions are stored in a local JSON file to persist across sessions."""
 
-    def __init__(self, region = 'eu-west-1'):
+    def __init__(self, region = 'eu-west-1', test_mode = False):
 
         """Initializes the AlertManager by setting up the SNS client and loading existing subscriptions from disk."""
+
+        self.test_mode = test_mode
+
+        if test_mode:
+            print("Running in test mode - Actual SMS alerts will not be sent.")
 
         self.sns = boto3.client(
             'sns',
@@ -32,6 +37,10 @@ class AlertManager:
         #Load existing subscriptions from disk or initialize an empty dictionary if the file doesn't exist.
         self.subcriptions = self._load_subscriptions()
 
+        #Store 5 minutes alert cooldown cahce to stop alert spam.
+        self._cooldowns = {}
+        self.cooldown_seconds = 300
+
     def _load_subscriptions(self):
 
         """Loads existing subscriptions from a local JSON file. If the file doesn't exist, returns an empty dictionary."""
@@ -47,6 +56,23 @@ class AlertManager:
 
         with open('subscriptions.json', 'w') as f:
             json.dump(self.subcriptions, f)
+
+    def _should_alert(self, label, src_ip):
+        
+        key = (src_ip, label)
+        now = datetime.now()
+
+        if key in self._cooldowns:
+            elapsed_time = (now - self._cooldowns[key]).total_seconds()
+
+            if elapsed_time < self.cooldown_seconds:
+                remaining = self.cooldown_seconds - elapsed_time
+
+                print (f"[ALERT COOLDOWN] Duplicate alert detected: {label} from {src_ip} | {remaining:.0f}s remaining on alert cooldown.")
+                return False
+            
+        self._cooldowns[key] = now
+        return True
 
     def subscribe(self, phone_number):
 
@@ -104,6 +130,13 @@ class AlertManager:
     def send_alert(self, label, confidence, src_ip, dst_ip, src_port, dst_port, protocol):
 
         """Sends an alert via SNS with the details of the detected attack. Returns True if successful, False otherwise."""
+
+        if not self._should_alert(label, src_ip):
+            return False
+        
+        if self.test_mode:
+            print(f"[TEST MODE] would send SMS: {label} ({confidence:.2f}%) {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
+            return True
 
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

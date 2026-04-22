@@ -19,7 +19,7 @@ load_dotenv()
 #Init managers
 flow_manager = FlowManager()
 predictor = Predictor()
-alert_manager = AlertManager()
+alert_manager = None
 threat_intel = ThreatIntel()
 
 
@@ -170,8 +170,11 @@ def start_monitor(interface = None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--iface', type = str, default = None)
+    parser.add_argument('--iface', type = str, help = 'Choose what interface to listen on', default = None)
+    parser.add_argument('--test', action = 'store_true', help = 'Run in test mode - Alerts wont be actually be sent')
     args = parser.parse_args()
+
+    alert_manager = AlertManager(test_mode = args.test)
 
     dashboard_thread = threading.Thread(
         target = start_dashboard,
