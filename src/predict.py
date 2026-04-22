@@ -5,10 +5,11 @@ import joblib
 import numpy as np
 import os
 import pandas as pd
+import time
 
 class Predictor:
 
-    def __init__(self, model_path = 'models/nids_model.pkl', encoder_path = 'models/label_encoder.pkl'):
+    def __init__(self, model_path = 'models/nids.pkl', encoder_path = 'models/label_encoder.pkl'):
 
         """Initializes the Predictor by loading the trained model and label encoder from disk."""
 
@@ -32,17 +33,42 @@ class Predictor:
                 nan = 0.0,
                 posinf = 0.0,
                 neginf = 0.0
-            )
+            ).reshape(1, -1)
 
             #Get feature names from model
             features_names = self.model.feature_names_in_
-            features_df = pd.DataFrame([features_array], columns = features_names)
+            features_df = pd.DataFrame(features_array, columns = features_names)
 
-            prediction = self.model.predict(features_df)
-            probabilitity = self.model.predict_proba(features_df)
 
-            label = self.encoder.inverse_transform(prediction)[0]
-            confidence = np.max(probabilitity) * 100
+            start = time.perf_counter()
+            probabilitity = self.model.predict_proba(features_df)[0]
+            prediction_time = (time.perf_counter() - start) * 1000
+
+            classes = self.encoder.classes_
+
+            print("\n ----- Flow Stats -----")
+            for cls, prob in sorted(zip(classes, probabilitity), key = lambda x: x[1], reverse = True):
+                print(f"{cls: < 35} {prob * 100:6.2f}%")
+            print(f"Prediction time: {prediction_time:.2f}ms")
+
+            #Detection threshold
+            benign_idx = list(classes).index('BENIGN')
+            benign_prob = probabilitity[benign_idx]
+
+            max_idx = np.argmax(probabilitity)
+            label = classes[max_idx]
+            confidence = probabilitity[max_idx] * 100
+
+            if benign_prob < 0.80:
+                attack_probs = [(classes[i], probabilitity[i])
+                                for i in range (len(classes))
+                                if classes[i] != 'BENIGN']
+                
+                attack_probs.sort(key = lambda x: x[1], reverse = True)
+                top_attack = attack_probs[0]
+
+                if top_attack[1] > 0.05:
+                    return top_attack[0], top_attack[1] * 100
 
             return label, confidence
         except Exception as e:
@@ -51,4 +77,6 @@ class Predictor:
         
     def is_attack(self, label):
         """Determines if the predicted label indicates an attack or benign flow."""
+        if label == 'Error':
+            return False
         return label != 'BENIGN'
