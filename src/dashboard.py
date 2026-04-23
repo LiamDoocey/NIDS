@@ -16,6 +16,12 @@ app = Flask(
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
+_alert_manager = None
+
+def set_alert_manager(manager):
+    global _alert_manager
+    _alert_manager = manager
+
 init_db()
 
 @app.route('/')
@@ -65,6 +71,25 @@ def add_traffic_event(event_type, label, src_ip, dst_ip, src_port, dst_port, pro
     if event_type in ('ALERT', 'THREAT_INTEL_MATCH'):
         log_alert(event_type, label, src_ip, dst_ip, src_port, dst_port, protocol, confidence)
 
+@app.route('/api/subscriptions', methods = ['GET'])
+def get_subcriptions_route():
+    return jsonify(_alert_manager.get_subscriptions())
+
+@app.route('/api/subscriptions', methods = ['POST'])
+def subscribe_route():
+    data = request.json
+    phone = data.get('phone_number')
+
+    if not phone:
+        return jsonify({'success': False, 'error': 'No phone number provided'}), 400
+    success = _alert_manager.subscribe(phone)
+
+    return jsonify({'success': success})
+
+@app.route('/api/subscriptions/<phone>', methods = ['DELETE'])
+def unsubscribe_route(phone):
+    success = _alert_manager.unsubscribe(phone)
+    return jsonify({'success': success})
 
 def start_dashboard(host = '0.0.0.0', port = 5000, debug = False):
     print(f"Starting dashboard on {host}:{port}...")

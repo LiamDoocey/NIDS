@@ -8,7 +8,7 @@ from features import extract_features
 from predict import Predictor
 from alerts import AlertManager
 from threat_intel import ThreatIntel
-from dashboard import add_traffic_event, start_dashboard
+from dashboard import add_traffic_event, start_dashboard, set_alert_manager
 import threading 
 import time
 import argparse
@@ -196,6 +196,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     alert_manager = AlertManager(test_mode = args.test)
+    set_alert_manager(alert_manager)
 
     dashboard_thread = threading.Thread(
         target = start_dashboard,

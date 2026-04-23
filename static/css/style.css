@@ -232,3 +232,150 @@ canvas {
     color: #e6edf3;
     font-weight: 500;
 }
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 10px;
+    margin-bottom: 0;
+}
+ 
+.header h1 {
+    color: #58a6ff;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin: 0;
+}
+ 
+.alert-btn {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #8b949e;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+ 
+.alert-btn:hover {
+    background: #30363d;
+    color: #e6edf3;
+    border-color: #58a6ff;
+}
+ 
+.settings-section h4 {
+    margin: 0 0 6px;
+    color: #e6edf3;
+    font-size: 0.95em;
+}
+ 
+.settings-desc {
+    color: #8b949e;
+    font-size: 0.82em;
+    margin: 0 0 14px;
+}
+ 
+.subscription-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+ 
+.phone-input {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e6edf3;
+    font-size: 0.9em;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+ 
+.phone-input:focus {
+    border-color: #58a6ff;
+}
+ 
+.subscribe-btn {
+    background: #1f6feb;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85em;
+    padding: 8px 16px;
+    transition: background 0.2s;
+}
+ 
+.subscribe-btn:hover {
+    background: #388bfd;
+}
+ 
+.subscription-feedback {
+    border-radius: 6px;
+    font-size: 0.82em;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+}
+ 
+.subscription-feedback.success {
+    background: #1a3a1a;
+    border: 1px solid #3fb950;
+    color: #3fb950;
+}
+ 
+.subscription-feedback.error {
+    background: #3a1a1a;
+    border: 1px solid #f85149;
+    color: #f85149;
+}
+ 
+.subscription-feedback.hidden {
+    display: none;
+}
+ 
+.subscription-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+ 
+.subscription-item {
+    align-items: center;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+}
+ 
+.subscription-item span {
+    color: #e6edf3;
+    font-size: 0.88em;
+    font-family: monospace;
+}
+ 
+.unsubscribe-btn {
+    background: none;
+    border: 1px solid #f85149;
+    border-radius: 4px;
+    color: #f85149;
+    cursor: pointer;
+    font-size: 0.75em;
+    padding: 3px 8px;
+    transition: all 0.2s;
+}
+ 
+.unsubscribe-btn:hover {
+    background: #f85149;
+    color: #fff;
+}

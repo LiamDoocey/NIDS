@@ -165,6 +165,88 @@ function closeModal() {
     document.getElementById('modal-overlay').classList.add('hidden');
 }
 
+function openAlertSettings() {
+    document.getElementById('alert-settings-modal').classList.remove('hidden');
+    document.getElementById('settings-overlay').classList.remove('hidden');
+    loadSubscriptions();
+}
+ 
+function closeAlertSettings() {
+    document.getElementById('alert-settings-modal').classList.add('hidden');
+    document.getElementById('settings-overlay').classList.add('hidden');
+    hideFeedback();
+}
+ 
+function loadSubscriptions() {
+    fetch('/api/subscriptions')
+        .then(res => res.json())
+        .then(data => {
+            const list = document.getElementById('subscription-list');
+            if (data.length === 0) {
+                list.innerHTML = '<p class="no-alerts">No subscriptions yet</p>';
+                return;
+            }
+            list.innerHTML = data.map(phone => `
+                <div class="subscription-item">
+                    <span>${phone}</span>
+                    <button class="unsubscribe-btn" onclick="removeSubscription('${phone}')">Remove</button>
+                </div>
+            `).join('');
+        })
+        .catch(() => showFeedback('Failed to load subscriptions', 'error'));
+}
+ 
+function addSubscription() {
+    const phone = document.getElementById('phone-input').value.trim();
+    if (!phone) {
+        showFeedback('Please enter a phone number', 'error');
+        return;
+    }
+ 
+    fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('phone-input').value = '';
+            showFeedback('Subscribed successfully', 'success');
+            loadSubscriptions();
+        } else {
+            showFeedback('Already subscribed or invalid number', 'error');
+        }
+    })
+    .catch(() => showFeedback('Failed to subscribe', 'error'));
+}
+ 
+function removeSubscription(phone) {
+    fetch(`/api/subscriptions/${encodeURIComponent(phone)}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showFeedback('Unsubscribed successfully', 'success');
+                loadSubscriptions();
+            } else {
+                showFeedback('Failed to unsubscribe', 'error');
+            }
+        })
+        .catch(() => showFeedback('Failed to unsubscribe', 'error'));
+}
+ 
+function showFeedback(message, type) {
+    const el = document.getElementById('subscription-feedback');
+    el.textContent = message;
+    el.className = `subscription-feedback ${type}`;
+    setTimeout(hideFeedback, 3000);
+}
+ 
+function hideFeedback() {
+    const el = document.getElementById('subscription-feedback');
+    el.classList.add('hidden');
+}
+
 initChart();
 updateStats();
 updateChart();
