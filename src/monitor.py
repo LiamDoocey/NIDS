@@ -23,6 +23,8 @@ predictor = Predictor()
 alert_manager = None
 threat_intel = ThreatIntel()
 
+RED = '\033[91m'
+RESET = '\033[0m'
 
 def packet_callback(packet):
     
@@ -72,9 +74,9 @@ def packet_callback(packet):
                     #Layer 1: Check threat intelligence before ML prediction for faster detection of reported threats and to provide additional context in alerts.
                     intel = threat_intel.check_flow(src_ip, dst_ip)
                     if intel['is_threat']:
-                        print(f"[ALERT] Threat detected in flow: {src_ip} -> {dst_ip}")
+                        print(f"{RED}[ALERT] Threat detected in flow: {src_ip} -> {dst_ip}")
                         print(f"Source IP: {src_ip} | Destination IP: {dst_ip} | Source Port: {src_port} | Destination Port: {dst_port} | Protocol: {protocol} | Size: {size} bytes")
-                        print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
+                        print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}{RESET}")
 
                         if alert_manager.send_alert(
                             label='THREAT_INTEL_MATCH',
@@ -91,8 +93,8 @@ def packet_callback(packet):
                     #Layer 2: Use ML prediction to detect novel or unknown attacks based on flow features. 
                     # This allows us to catch emerging threats that may not be in threat intelligence databases yet.
                     if predictor.is_attack(label):
-                        print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
-                        print(f"Flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port} | Protocol: 'TCP' | Size: {size} bytes")
+                        print(f"{RED}[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
+                        print(f"Flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port} | Protocol: TCP | Size: {size} bytes{RESET}")
                         predictor.explain(features, label)
 
                         if alert_manager.send_alert(label, confidence, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP'):
@@ -135,9 +137,9 @@ def expire_flows_periodically():
                 #Layer 1: Check threat intelligence before ML prediction for faster detection of known threats and to provide additional context in alerts.
                 intel = threat_intel.check_flow(flow.src_ip, flow.dst_ip)
                 if intel['is_threat']:
-                    print(f"[ALERT] Threat detected in flow: {flow.src_ip} -> {flow.dst_ip}")
+                    print(f"{RED}[ALERT] Threat detected in flow: {flow.src_ip} -> {flow.dst_ip}")
                     print(f"Source IP: {flow.src_ip} | Destination IP: {flow.dst_ip} | Source Port: {flow.src_port} | Destination Port: {flow.dst_port} | Protocol: {proto}")
-                    print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
+                    print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}{RESET}")
 
                     if alert_manager.send_alert(
                         label='THREAT_INTEL_MATCH',
@@ -152,8 +154,8 @@ def expire_flows_periodically():
                 #Layer 2: Use ML prediction to detect novel or unknown attacks based on flow features. 
                 label, confidence = predictor.predict(features)
                 if predictor.is_attack(label):
-                    print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
-                    print(f"Flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} | Protocol: {proto}")
+                    print(f"{RED}[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
+                    print(f"Flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} | Protocol: {proto}{RESET}")
                     predictor.explain(features, label)
 
                     if alert_manager.send_alert(label, confidence, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, proto):

@@ -3,6 +3,7 @@ from alerts import AlertManager
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from database import *
+import logging
 
 load_dotenv()
 
@@ -11,6 +12,9 @@ app = Flask(
     template_folder = '../templates',
     static_folder = '../static'
 )
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 init_db()
 
