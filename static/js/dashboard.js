@@ -30,7 +30,7 @@ function initChart(){
                     fill: true
                 },
                 {
-                    label: 'Alerts',
+                    label: 'flagged Flows',
                     data: [],
                     borderColor: '#f85149',
                     backgroundColor: 'rgba(248, 81, 73, 0.1)',

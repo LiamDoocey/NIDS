@@ -95,14 +95,14 @@ def log_traffic_event(event_type):
     existing = cursor.fetchone()
 
     if existing:
-        if event_type == 'ALERT':
+        if event_type in ('ALERT', 'ALERT_SUPPRESSED'):
             cursor.execute('UPDATE traffic_history SET total = total + 1, alerts = alerts + 1 WHERE id = ?', (existing['id'],))
         elif event_type == 'THREAT_INTEL_MATCH':
             cursor.execute('UPDATE traffic_history SET total = total + 1, threats = threats + 1 WHERE id = ?', (existing['id'],))
         else:
             cursor.execute('UPDATE traffic_history SET total = total + 1, benign = benign + 1 WHERE id = ?', (existing['id'],))
     else:
-        alerts = 1 if event_type == 'ALERT' else 0
+        alerts = 1 if event_type in ('ALERT', 'ALERT_SUPPRESSED') else 0
         threats = 1 if event_type == 'THREAT_INTEL_MATCH' else 0
         benign = 1 if event_type == 'OK' else 0
         
@@ -114,6 +114,8 @@ def log_traffic_event(event_type):
     # Update lifetime stats
     if event_type == 'ALERT':
         cursor.execute('UPDATE stats SET total_flows = total_flows + 1, total_alerts = total_alerts + 1 WHERE id = 1')
+    elif event_type == 'ALERT_SUPPRESSED':
+        cursor.execute('UPDATE stats SET total_flows = total_flows + 1 WHERE id = 1')
     elif event_type == 'THREAT_INTEL_MATCH':
         cursor.execute('UPDATE stats SET total_flows = total_flows + 1, threat_intel_matches = threat_intel_matches + 1 WHERE id = 1')
     else:
@@ -193,7 +195,7 @@ def save_subscription(phone_number, subscription_arn):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute('INSERT OR REPLACE INTO subscriptions (phone_number, subscriptions_arn) VALUES (?, ?)', (phone_number, subscription_arn))
+    cursor.execute('INSERT OR REPLACE INTO subscriptions (phone_number, subscription_arn) VALUES (?, ?)', (phone_number, subscription_arn))
 
     conn.commit()
     conn.close()
@@ -202,7 +204,7 @@ def delete_subscription(phone_number):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute('DELETE FROM subscriptions WHERE phone_number = ?', (phone_number))
+    cursor.execute('DELETE FROM subscriptions WHERE phone_number = ?', (phone_number,))
 
     conn.commit()
     conn.close()

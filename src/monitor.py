@@ -97,8 +97,12 @@ def packet_callback(packet):
                         print(f"Flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port} | Protocol: TCP | Size: {size} bytes{RESET}")
                         predictor.explain(features, label)
 
-                        if alert_manager.send_alert(label, confidence, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP'):
+                        alerted = alert_manager.send_alert(label, confidence, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP')
+
+                        if alerted:
                             add_traffic_event('ALERT', label, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP', confidence)
+                        else:
+                            add_traffic_event('ALERT_SUPPRESSED', label, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP', confidence)
                     else:
                         print(f"[OK] Benign flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port}")
                         add_traffic_event('OK', 'BENIGN', completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, protocol, confidence)
