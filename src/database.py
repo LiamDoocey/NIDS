@@ -62,6 +62,14 @@ def init_db():
         )
     ''')
 
+    #Subscription table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            phone_number TEXT PRIMARY KEY,
+            subscription_arn TEXT NOT NULL
+        )
+    ''')
+
     #Insert default stats row if it doesn't exist
     cursor.execute('''
         INSERT OR IGNORE INTO stats (id, total_flows, total_alerts, benign_flows, threat_intel_matches)
@@ -180,3 +188,32 @@ def get_cooldown(src_ip, label):
     row = cursor.fetchone()
     conn.close()
     return datetime.fromisoformat(row['timestamp']) if row else None
+
+def save_subscription(phone_number, subscription_arn):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('INSERT OR REPLACE INTO subscriptions (phone_number, subscriptions_arn) VALUES (?, ?)', (phone_number, subscription_arn))
+
+    conn.commit()
+    conn.close()
+
+def delete_subscription(phone_number):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('DELETE FROM subscriptions WHERE phone_number = ?', (phone_number))
+
+    conn.commit()
+    conn.close()
+
+def get_all_subscriptions():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT phone_number, subscription_arn FROM subscriptions')
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return {row['phone_number']: row['subscription_arn'] for row in rows}

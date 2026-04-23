@@ -1,9 +1,8 @@
 import boto3
-import json
 import os
 import threading
 from datetime import datetime
-from database import set_cooldown, get_cooldown
+from database import set_cooldown, get_cooldown, save_subscription, delete_subscription, get_all_subscriptions
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -35,31 +34,12 @@ class AlertManager:
 
         if not self.topic_arn:
             raise ValueError("SNS_TOPIC_ARN environment variable not set.")
-        
-        #Load existing subscriptions from disk or initialize an empty dictionary if the file doesn't exist.
-        self.subcriptions = self._load_subscriptions()
 
         #Store 5 minutes alert cooldown cahce to stop alert spam.
         self._cooldowns = {}
         self.cooldown_seconds = 300
         self._lock = threading.Lock()
-
-    def _load_subscriptions(self):
-
-        """Loads existing subscriptions from a local JSON file. If the file doesn't exist, returns an empty dictionary."""
-
-        if os.path.exists('subscriptions.json'):
-            with open('subscriptions.json', 'r') as f:
-                return json.load(f)
-        return {}
     
-    def _save_subscriptions(self):
-
-        """Saves the current subscriptions to a local JSON file to persist them across sessions."""
-
-        with open('subscriptions.json', 'w') as f:
-            json.dump(self.subcriptions, f)
-
     def _should_alert(self, label, src_ip, dst_ip, dst_port):
 
         attacker_ip = src_ip if dst_port is not None and dst_port < 1024 else dst_ip
@@ -85,7 +65,9 @@ class AlertManager:
         """Subscribes a phone number to the SNS topic to receive SMS alerts. Returns True if successful, False otherwise."""
 
         try:
-            if phone_number in self.subcriptions:
+            subs = get_all_subscriptions()
+
+            if phone_number in subs:
                 print(f"{phone_number} is already subscribed.")
                 return False
             
@@ -95,8 +77,7 @@ class AlertManager:
                 Endpoint = phone_number
             )
 
-            self.subcriptions[phone_number] = response['SubscriptionArn']
-            self._save_subscriptions()
+            save_subscription(phone_number, response['SubscriptionArn'])
             print(f"Subscribed {phone_number} successfully.")
             return True
         
@@ -109,16 +90,15 @@ class AlertManager:
         """Unsubscribes a phone number from the SNS topic. Returns True if successful, False otherwise."""
 
         try:
-            if phone_number not in self.subcriptions:
+
+            subs = get_all_subscriptions()
+
+            if phone_number not in subs:
                 print(f"{phone_number} is not subscribed.")
                 return False
             
-            self.sns.unsubscribe(
-                SubscriptionArn = self.subcriptions[phone_number]
-            )
-
-            del self.subcriptions[phone_number]
-            self._save_subscriptions()
+            self.sns.unsubscribe(SubscriptionArn=subs[phone_number])
+            delete_subscription(phone_number)
 
             print(f"Unsubscribed {phone_number} successfully.")
             return True
@@ -131,7 +111,7 @@ class AlertManager:
 
         """Returns a list of currently subscribed phone numbers."""
 
-        return list(self.subcriptions.keys())
+        return list(get_all_subscriptions().keys())
     
     def send_alert(self, label, confidence, src_ip, dst_ip, src_port, dst_port, protocol):
 
