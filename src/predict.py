@@ -6,6 +6,7 @@ import numpy as np
 import os
 import pandas as pd
 import time
+import shap
 
 class Predictor:
 
@@ -22,6 +23,28 @@ class Predictor:
         self.model = joblib.load(model_path)
         self.encoder = joblib.load(encoder_path)
         print("Model and label encoder loaded successfully.")
+
+        self.explainer = shap.TreeExplainer(self.model)
+        self.feature_names = self.model.feature_names_in_
+
+    def explain(self, features, predicted_label):
+        features_array = np.array(features).reshape(1, -1)
+        shap_values = self.explainer.shap_values(features_array)
+
+        class_idx = list(self.encoder.classes_).index(predicted_label)
+        feature_shap = shap_values[0, :, class_idx]
+
+        contributions = sorted(
+            zip(self.feature_names, features, feature_shap),
+            key = lambda x: abs(x[2]),
+            reverse = True
+        )
+
+        print(f"\n[SHAP EXPLANATION] Top contributors for {predicted_label}:")
+        for fname, fval, shap_val in contributions[:10]:
+            direction = 'POS+' if shap_val > 0 else 'NEG-'
+            print(f"  {direction} {fname:<30} value={fval:>10.2f}  impact={shap_val:>+.4f}")
+        print()
 
     def predict(self, features):
 
@@ -45,12 +68,6 @@ class Predictor:
             prediction_time = (time.perf_counter() - start) * 1000
 
             classes = self.encoder.classes_
-
-            print("\n ----- Flow Stats -----")
-            for cls, prob in sorted(zip(classes, probabilitity), key = lambda x: x[1], reverse = True):
-                print(f"{cls:<35} {prob * 100:6.2f}%")
-            print(f"Prediction time: {prediction_time:.2f}ms")
-
             #Detection threshold
             benign_idx = list(classes).index('BENIGN')
             benign_prob = probabilitity[benign_idx]
@@ -59,7 +76,7 @@ class Predictor:
             label = classes[max_idx]
             confidence = probabilitity[max_idx] * 100
 
-            if benign_prob < 0.80:
+            if benign_prob < 0.50:
                 attack_probs = [(classes[i], probabilitity[i])
                                 for i in range (len(classes))
                                 if classes[i] != 'BENIGN']
@@ -67,8 +84,10 @@ class Predictor:
                 attack_probs.sort(key = lambda x: x[1], reverse = True)
                 top_attack = attack_probs[0]
 
-                if top_attack[1] > 0.05:
+                if top_attack[1] > 0.50:
                     return top_attack[0], top_attack[1] * 100
+                else:
+                    return 'BENIGN', benign_prob * 100 #Return as benign if model is not at least 50% confident in its attack type
 
             return label, confidence
         except Exception as e:

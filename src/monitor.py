@@ -12,6 +12,7 @@ from dashboard import add_traffic_event, start_dashboard
 import threading 
 import time
 import argparse
+import subprocess
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -47,45 +48,58 @@ def packet_callback(packet):
             dst_port = packet[TCP].dport
             flags = packet[TCP].flags
 
+            window = packet[TCP].window
+            payload_size = len(packet[TCP].payload)
+            header_size = packet[TCP].dataofs * 4
+
             #Add packet to the flow manager and check if the flow is completed (FIN/RST)
             completed = flow_manager.add_packet(
-                src_ip, dst_ip, src_port, dst_port, protocol, size, flags, timestamp = timestamp
+                src_ip, dst_ip, src_port, dst_port, protocol, size, flags, 
+                timestamp = timestamp, 
+                window = window,
+                payload_size = payload_size,
+                header_size = header_size
             )
 
             #If the flow is completed, extract features
             if completed:
-                features = extract_features(completed, dst_port)
+                if completed.src_port < 1024:
+                    add_traffic_event('OK', 'BENIGN', completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP', 100.0)
 
-                #Layer 1: Check threat intelligence before ML prediction for faster detection of known threats and to provide additional context in alerts.
-                intel = threat_intel.check_flow(src_ip, dst_ip)
-                if intel['is_threat']:
-                    print(f"[ALERT] Threat detected in flow: {src_ip} -> {dst_ip}")
-                    print(f"Source IP: {src_ip} | Destination IP: {dst_ip} | Source Port: {src_port} | Destination Port: {dst_port} | Protocol: TCP | Size: {size} bytes")
-                    print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
-
-                    if alert_manager.send_alert(
-                        label='THREAT_INTEL_MATCH',
-                        confidence=intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'],
-                        src_ip=src_ip, dst_ip=dst_ip, src_port=src_port, dst_port=dst_port, protocol='TCP'
-                    ):
-                        add_traffic_event('THREAT_INTEL_MATCH', 'THREAT_INTEL_MATCH',
-                            src_ip, dst_ip, src_port, dst_port, 'TCP',
-                            intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'])
-                    return
-
-                label, confidence = predictor.predict(features)
-            
-                #Layer 2: Use ML prediction to detect novel or unknown attacks based on flow features. 
-                # This allows us to catch emerging threats that may not be in threat intelligence databases yet.
-                if predictor.is_attack(label):
-                    print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
-                    print(f"Flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port} | Protocol: {'TCP'} | Size: {size} bytes")
-
-                    if alert_manager.send_alert(label, confidence, src_ip, dst_ip, src_port, dst_port, 'TCP'):
-                        add_traffic_event('ALERT', label, src_ip, dst_ip, src_port, dst_port, 'TCP', confidence)
                 else:
-                    print(f"[OK] Benign flow: {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
-                    add_traffic_event('OK', 'BENIGN', src_ip, dst_ip, src_port, dst_port, 'TCP', confidence)
+                    features = extract_features(completed, completed.dst_port)
+
+                    #Layer 1: Check threat intelligence before ML prediction for faster detection of reported threats and to provide additional context in alerts.
+                    intel = threat_intel.check_flow(src_ip, dst_ip)
+                    if intel['is_threat']:
+                        print(f"[ALERT] Threat detected in flow: {src_ip} -> {dst_ip}")
+                        print(f"Source IP: {src_ip} | Destination IP: {dst_ip} | Source Port: {src_port} | Destination Port: {dst_port} | Protocol: {protocol} | Size: {size} bytes")
+                        print(f"Threat Intel - Source IP: {intel['src_ip_info']} | Destination IP: {intel['dst_ip_info']}")
+
+                        if alert_manager.send_alert(
+                            label='THREAT_INTEL_MATCH',
+                            confidence=intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'],
+                            src_ip=src_ip, dst_ip=dst_ip, src_port=src_port, dst_port=dst_port, protocol=protocol
+                        ):
+                            add_traffic_event('THREAT_INTEL_MATCH', 'THREAT_INTEL_MATCH',
+                                src_ip, dst_ip, src_port, dst_port, 'TCP',
+                                intel['src_ip_info']['abuse_score'] if intel['src_ip_info'] else intel['dst_ip_info']['abuse_score'])
+                        return
+
+                    label, confidence = predictor.predict(features)
+                
+                    #Layer 2: Use ML prediction to detect novel or unknown attacks based on flow features. 
+                    # This allows us to catch emerging threats that may not be in threat intelligence databases yet.
+                    if predictor.is_attack(label):
+                        print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
+                        print(f"Flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port} | Protocol: 'TCP' | Size: {size} bytes")
+                        predictor.explain(features, label)
+
+                        if alert_manager.send_alert(label, confidence, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP'):
+                            add_traffic_event('ALERT', label, completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, 'TCP', confidence)
+                    else:
+                        print(f"[OK] Benign flow: {completed.src_ip}:{completed.src_port} -> {completed.dst_ip}:{completed.dst_port}")
+                        add_traffic_event('OK', 'BENIGN', completed.src_ip, completed.dst_ip, completed.src_port, completed.dst_port, protocol, confidence)
     
 
         elif UDP in packet:
@@ -107,8 +121,16 @@ def expire_flows_periodically():
         expired = flow_manager.expire_flows()
         for flow in expired:
             if flow.packets:
-                features = extract_features(flow, flow.dst_port)
+                
                 proto = 'UDP' if flow.protocol == 17 else 'TCP'
+            
+                if flow.dst_port >= 1024 and flow.src_port < 1024:
+                    print(f"[OK] Server response flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
+                    add_traffic_event('OK', 'BENIGN', flow.src_ip, flow.dst_ip,
+                                     flow.src_port, flow.dst_port, proto, 100.0)
+                    continue
+
+                features = extract_features(flow, flow.dst_port)
 
                 #Layer 1: Check threat intelligence before ML prediction for faster detection of known threats and to provide additional context in alerts.
                 intel = threat_intel.check_flow(flow.src_ip, flow.dst_ip)
@@ -132,18 +154,22 @@ def expire_flows_periodically():
                 if predictor.is_attack(label):
                     print(f"[ALERT] Attack detected: {label} with {confidence:.2f}% confidence")
                     print(f"Flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} | Protocol: {proto}")
+                    predictor.explain(features, label)
 
-                    if alert_manager.send_alert(label, confidence, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, 'UDP'):
-                        add_traffic_event('ALERT', label, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, 'UDP', confidence)
+                    if alert_manager.send_alert(label, confidence, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, proto):
+                        add_traffic_event('ALERT', label, flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, proto, confidence)
                 else:
                     print(f"[OK] Benign flow: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port}")
-                    add_traffic_event('OK', 'BENIGN', flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, 'UDP', confidence)
+                    add_traffic_event('OK', 'BENIGN', flow.src_ip, flow.dst_ip, flow.src_port, flow.dst_port, proto, confidence)
 
 
 def start_monitor(interface = None):
 
     """Starts the network monitor by initializing the flow manager, starting the expiry thread, and beginning packet capture on the default
     interface if none is specified."""
+
+    result = subprocess.run(['cat', '/sys/class/net/eth0/address'], capture_output = True, text = True)
+    nids_mac = result.stdout.strip()
 
     print("Starting network monitor...")
 
@@ -157,7 +183,8 @@ def start_monitor(interface = None):
     sniff(
         iface =  interface,
         prn = packet_callback,
-        store = False
+        store = False,
+        filter = f"ether dst {nids_mac} and not dst host 192.168.100.10"
     )
 
 if __name__ == "__main__":

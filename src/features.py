@@ -12,11 +12,12 @@ def extract_features(flow, dst_port):
     fwd = flow.fwd_packets
     bwd = flow.bwd_packets
     duration = flow.duration()
+    duration_seconds = duration / 1e6
 
     #Use [0] for empty lists to avoid issues with empty sequence errors
-    fwd_sizes = fwd if fwd else [0]
-    bwd_sizes = bwd if bwd else [0]
-    all_sizes = [p['size'] for p in packets]
+    fwd_sizes = [p['payload_size'] for p in packets if p['direction'] == 'fwd'] or [0]
+    bwd_sizes = [p['payload_size'] for p in packets if p['direction'] == 'bwd'] or [0]
+    all_sizes = [p['payload_size'] for p in packets]
 
     #----- Inter arrival times ------
     #Time between consevutive packets in microseconds to match CIC-IDS-2017 format
@@ -38,6 +39,22 @@ def extract_features(flow, dst_port):
     fwd_flags = [p['flags'] for p in packets if p['direction'] == 'fwd' and p['flags']]
     bwd_flags = [p['flags'] for p in packets if p['direction'] == 'bwd' and p['flags']]
     all_flags = fwd_flags + bwd_flags
+
+    init_win_fwd = 0
+    init_win_bwd = 0
+
+    for p in packets:
+        if p['flags'] and 'S' in str(p['flags']) and 'A' not in str(p['flags']):
+            if p['direction'] == 'fwd' and init_win_fwd == 0:
+                init_win_fwd = p.get('window', 0)
+            elif p['direction'] == 'bwd' and init_win_bwd == 0:
+                init_win_bwd = p.get('window', 0)
+
+
+    first_fwd_header = min(p.get('header_size', 20) for p in packets if p['direction'] == 'fwd') if any(p['direction'] == 'fwd' for p in packets) else 0
+
+    fwd_header_total = sum(p.get('header_size', 20) for p in packets if p['direction'] == 'fwd')
+    bwd_header_total = sum(p.get('header_size', 20) for p in packets if p['direction'] == 'bwd')
 
     def count_flag(flag_list, flag):
 
@@ -69,8 +86,8 @@ def extract_features(flow, dst_port):
         min(bwd_sizes),                         # Bwd Packet Length Min
         np.mean(bwd_sizes),                     # Bwd Packet Length Mean
         np.std(bwd_sizes),                      # Bwd Packet Length Std
-        safe_div(sum(all_sizes), duration),     # Flow Bytes/s
-        safe_div(len(packets), duration),       # Flow Packets/s
+        safe_div(sum(all_sizes), duration_seconds),  # Flow Bytes/s
+        safe_div(len(packets), duration_seconds),    # Flow Packets/s
         np.mean(iats),                          # Flow IAT Mean
         np.std(iats),                           # Flow IAT Std
         max(iats),                              # Flow IAT Max
@@ -87,36 +104,36 @@ def extract_features(flow, dst_port):
         min(bwd_iats),                          # Bwd IAT Min
         count_flag(fwd_flags, 'P'),             # Fwd PSH Flags
         count_flag(fwd_flags, 'U'),             # Fwd URG Flags
-        len(fwd) * 20,                          # Fwd Header Length
-        len(bwd) * 20,                          # Bwd Header Length
-        safe_div(len(fwd), duration),           # Fwd Packets/s
-        safe_div(len(bwd), duration),           # Bwd Packets/s
+        fwd_header_total,                       # Fwd Header Length
+        bwd_header_total,                       # Bwd Header Length
+        safe_div(len(fwd), duration_seconds),   # Fwd Packets/s
+        safe_div(len(bwd), duration_seconds),   # Bwd Packets/s
         min(all_sizes),                         # Min Packet Length
         max(all_sizes),                         # Max Packet Length
         np.mean(all_sizes),                     # Packet Length Mean
         np.std(all_sizes),                      # Packet Length Std
         np.var(all_sizes),                      # Packet Length Variance
         count_flag(all_flags, 'F'),             # FIN Flag Count
-        count_flag(all_flags, 'S'),             # SYN Flag Count
+        count_flag(fwd_flags, 'S'),             # SYN Flag Count
         count_flag(all_flags, 'R'),             # RST Flag Count
         count_flag(all_flags, 'P'),             # PSH Flag Count
         count_flag(all_flags, 'A'),             # ACK Flag Count
         count_flag(all_flags, 'U'),             # URG Flag Count
         count_flag(all_flags, 'C'),             # CWE Flag Count
         count_flag(all_flags, 'E'),             # ECE Flag Count
-        safe_div(len(bwd), len(fwd)),           # Down/Up Ratio
+        int(safe_div(len(bwd), len(fwd))),           # Down/Up Ratio
         np.mean(all_sizes),                     # Average Packet Size
         np.mean(fwd_sizes),                     # Avg Fwd Segment Size
         np.mean(bwd_sizes),                     # Avg Bwd Segment Size
-        len(fwd) * 20,                          # Fwd Header Length.1 (duplicate in dataset)
+        fwd_header_total,                       # Fwd Header Length.1 (duplicate in dataset)
         len(fwd),                               # Subflow Fwd Packets
         sum(fwd_sizes),                         # Subflow Fwd Bytes
         len(bwd),                               # Subflow Bwd Packets
         sum(bwd_sizes),                         # Subflow Bwd Bytes
-        65535,                                  # Init_Win_bytes_forward
-        65535,                                  # Init_Win_bytes_backward
-        len([p for p in fwd_sizes if p > 0]),  # act_data_pkt_fwd
-        min(fwd_sizes),                         # min_seg_size_forward
+        init_win_fwd,                           # Init_Win_bytes_forward
+        init_win_bwd,                           # Init_Win_bytes_backward
+        len([p for p in fwd_sizes if p > 0]),   # act_data_pkt_fwd
+        first_fwd_header,                       # min_seg_size_forward
         np.mean(iats),                          # Active Mean
         np.std(iats),                           # Active Std
         max(iats),                              # Active Max

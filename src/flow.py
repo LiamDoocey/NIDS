@@ -26,16 +26,28 @@ class Flow:
         self.last_seen = timestamp
         self.is_active = True
 
-    def add_packet(self, size, timestamp, direction, flags = None):
+    def add_packet(self, size, timestamp, direction, flags = None, window = 0, payload_size = 0, header_size = 0):
 
         """Adds a packet to the flow, updating packet lists, timestamps, and state.
           If TCP flags indicate FIN/RST, marks the flow as completed."""
+        
+        if self.packets:
+
+            last = self.packets[-1]
+            time_diff = abs((timestamp - last['timestamp']).total_seconds())
+
+            if time_diff < 0.001 and size == last['size'] and str(flags) == str(last['flags']):
+                return
+
 
         self.packets.append({
             'size': size,
             'timestamp': timestamp,
             'direction': direction,
-            'flags': flags
+            'flags': flags,
+            'window': window,
+            'payload_size': payload_size,
+            'header_size': header_size
         })
 
         #Update forward/backward packet lists based on direction for easier feature extraction
@@ -58,7 +70,19 @@ class Flow:
           If no timeout is provided, uses default values based on protocol (30s for UDP, 120s for TCP)."""
 
         if timeout is None:
-            timeout = 30 if self.protocol == 17 else 120 #UDP = 17, TCP = 6
+            if self.protocol == 17:
+                timeout = 30
+            elif len(self.packets) <= 2:
+                timeout = 10
+            else:
+                timeout = 120
+
+        if self.dst_port == 80 and len(self.packets) > 2:
+            duration_seconds = (current_time - self.start_time).total_seconds()
+            packets_per_second = len(self.packets) / duration_seconds if duration_seconds > 0 else 0
+            if packets_per_second < 1.0 and duration_seconds > 30:
+                return True
+        
         return (current_time - self.last_seen).total_seconds() > timeout
     
 class FlowManager:
@@ -77,14 +101,14 @@ class FlowManager:
         backward = (dst_ip, src_ip, dst_port, src_port, protocol)
         return min(forward, backward)
         
-    def add_packet(self, src_ip, dst_ip, src_port, dst_port, protocol, size, flags = None, timestamp = None):
+    def add_packet(self, src_ip, dst_ip, src_port, dst_port, protocol, size, flags = None, timestamp = None, window = 0, payload_size = 0, header_size = 0):
 
         """Adds a packet to the appropriate flow, creating a new flow if necessary.
             If TCP flags indicate FIN/RST, marks the flow as completed and returns it for feature extraction."""
 
         if timestamp is None:
             timestamp = datetime.now()
-            
+
         key = self.get_flow_key(src_ip, dst_ip, src_port, dst_port, protocol)
 
         #Check for TCP FIN/RST flags to determine if the flow is completed
@@ -92,6 +116,9 @@ class FlowManager:
         if flags:
             fin_rst = 'F' in str(flags) or 'R' in str(flags)
 
+        if fin_rst and key not in self.flows:
+            return None
+        
         #Create new flow if it doesn't exist, then add packet to the flow
         if key not in self.flows:
             self.flows[key] = Flow(
@@ -107,7 +134,7 @@ class FlowManager:
         else:
             direction = 'bwd'
 
-        flow.add_packet(size, timestamp, direction, flags)
+        flow.add_packet(size, timestamp, direction, flags, window, payload_size, header_size)
 
         #Complete flopw if FIN/RST flags are seen in TCP packets
         if fin_rst:
